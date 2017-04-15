@@ -110,6 +110,11 @@ rootConf = {
     "monitorTables" : [],
     "pluginPath" : "",
     "plugins" : [],
+    "tuling_api_key": "c268de590aed467dba359955708c38c8",
+    "tuling_reply_prefix": "🤖: ",
+    "tuling_whitelist" : "",
+    "tuling_blacklist" : "",
+    "tuling_command" : "",
 }
 
 if sys.argv[0].endswith('.py') or sys.argv[0].endswith('.pyc'):
@@ -302,7 +307,7 @@ class QConf(object):
                         names = ['默认配置', self.user]
                 else:
                     names = ['默认配置']
-                    
+
                 for name in names:
                     for k, v in list(cusConf.get(name, {}).items()):
                         if k not in conf:
