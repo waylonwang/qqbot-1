@@ -5,7 +5,7 @@ p = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if p not in sys.path:
     sys.path.insert(0, p)
 
-version = 'v2.1.15'
+version = 'v2.1.19'
 
 sampleConfStr = '''{
 
@@ -64,6 +64,9 @@ sampleConfStr = '''{
         
         # 启动时需加载的插件
         "plugins" : ['sample1'],
+        
+        # 插件的配置（由用户自定义）
+        "pluginsConf" : {},
     
     },
     
@@ -90,6 +93,7 @@ sampleConfStr = '''{
     #     "monitorTables" : [],
     #     "pluginPath" : "",
     #     "plugins" : [],
+    #     "pluginsConf" : {}
     # },
 
 }
@@ -110,11 +114,7 @@ rootConf = {
     "monitorTables" : [],
     "pluginPath" : "",
     "plugins" : [],
-    "tuling_api_key": "c268de590aed467dba359955708c38c8",
-    "tuling_reply_prefix": "🤖: ",
-    "tuling_whitelist" : "",
-    "tuling_blacklist" : "",
-    "tuling_command" : "",
+    "pluginsConf" : {},
 }
 
 if sys.argv[0].endswith('.py') or sys.argv[0].endswith('.pyc'):
@@ -307,7 +307,7 @@ class QConf(object):
                         names = ['默认配置', self.user]
                 else:
                     names = ['默认配置']
-
+                    
                 for name in names:
                     for k, v in list(cusConf.get(name, {}).items()):
                         if k not in conf:
@@ -411,6 +411,19 @@ class QConf(object):
     @classmethod
     def QrcodePath(cls, qrcodeId):
         return cls.absPath(qrcodeId+'.png')
+    
+    def StoreQQ(self):
+        with open(self.absPath('this-is-a-tmp-file'), 'w') as f:
+            f.write(self.qq)
+    
+    def LoadQQ(self):
+        with open(self.absPath('this-is-a-tmp-file'), 'r') as f:
+            qq = f.read()
+        try:
+            os.remove(self.absPath('this-is-a-tmp-file'))
+        except OSError:
+            pass
+        return qq
 
 if not os.path.exists(QConf.tmpDir):
     os.mkdir(QConf.tmpDir)

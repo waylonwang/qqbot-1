@@ -29,12 +29,8 @@ class QContact(object):
             v = str(v)
             if v:
                 self.__dict__[k] = v
-        for tag in TAGS:
-            if tag[:-1] not in self.__dict__:
-                self.__dict__[tag[:-1]] = ''
 
         self.__dict__['shortRepr'] = '%s“%s”' % (CTYPES[self.ctype],self.name)
-       # self.__dict__['json'] = JsonDumps(self.__dict__, ensure_ascii=False)
     
     def __str__(self):
         return self.shortRepr
@@ -44,6 +40,17 @@ class QContact(object):
 
     def __setattr__(self, k, v):
         raise TypeError("QContact object is readonly")
+    
+    # getattr 不能乱定义，否则会引起对象无法 pickle 的问题
+    # 感谢 @lixindreamer 不二 kairyu 提供帮助
+    # http://stackoverflow.com/questions/2049849/why-cant-i-pickle-this-object
+    # http://stackoverflow.com/questions/12101574/why-does-pickle-dumps-call-getattr
+    # http://stackoverflow.com/questions/2405590/how-do-i-override-getattr-in-python-without-breaking-the-default-behavior
+    def __getattr__(self, k):
+        if not k.startswith('__'):
+            return ''
+        else:
+            raise AttributeError
 
 class QContactTable(object):
     def __init__(self, ctype):
@@ -82,12 +89,15 @@ class QContactTable(object):
                 attr = getattr(c, tag[:-1], '')
                 if attr:
                     key = tag + attr
-                    try:                    
-                        self.cdict.get(key, []).remove(c)
-                    except ValueError:
-                        pass
+                    if key in self.cdict:
+                        try:                    
+                            self.cdict.get(key).remove(c)
+                        except ValueError:
+                            pass
+                        if not self.cdict.get(key):
+                            self.cdict.pop(key)
             return c
-    
+
     def SetCard(self, c, card):
         ocard = getattr(c, 'card', '')
         if c in self and ocard != card:
@@ -97,10 +107,10 @@ class QContactTable(object):
             if card:
                 self.cdict['card='+card].append(c)
                 self.cdict['name='+card].append(c)
-                c.__dict__['name'] = card
-                c.__dict__['card'] = card
-            else:
-                c.__dict__['name'] = getattr(c, 'nick', '')
+
+            c.__dict__['card'] = card
+            c.__dict__['name'] = c.card or c.nick
+            c.__dict__['shortRepr'] = '%s“%s”' % (CTYPES[self.ctype], c.name)
     
     def SetUin(self, c, uin):
         c.__dict__['uin'] = uin
@@ -170,7 +180,7 @@ class QContactDB(object):
             with open(picklePath, 'wb') as f:
                 pickle.dump((session.__dict__, d), f)
         except Exception as e:
-            WARN('保存登录信息失败：%s %s', (e, picklePath))
+            WARN('保存登录信息失败：%s %s', e, picklePath)
         else:
             DEBUG('登录信息及联系人资料已保存至文件：file://%s' % picklePath)
     
@@ -197,6 +207,23 @@ class QContactDB(object):
             tb = self.session.FetchTable(tinfo)
             tb and self.setTable(tinfo, tb)
         return tb
+    
+    def Update(self, tinfo, bot):
+        tb = self.session.FetchTable(tinfo)
+        
+        if tb:
+            self.updateTable(tinfo, tb, bot)
+            status = '成功'
+        else:
+            status = '失败'
+        
+        ctype, owner = GetCTypeAndOwner(tinfo)
+        if ctype in ('buddy', 'group', 'discuss'):
+            action = '更新 %s 列表' % CTYPES[ctype]
+        else:
+            action = '更新 %s 的成员列表' % owner
+        
+        return action + status
     
     def List(self, tinfo, cinfo=None):
         table = self.table(tinfo)
@@ -434,6 +461,7 @@ class QContactDB(object):
 
     def DeleteMember(self, group, memb, bot):
         if self._table(group).Remove(memb):
+            INFO('丢失联系人： %s(owner=%s)', memb, group)
             Put(bot.onLostContact, memb, group)
 
     def SetMemberCard(self, group, memb, card):
